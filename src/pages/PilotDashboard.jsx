@@ -18,6 +18,14 @@ const pilotIcon = new L.DivIcon({
   iconAnchor: [22, 22],
 });
 
+// 📍 Target Mission Marker
+const missionTargetIcon = new L.DivIcon({
+  html: `<div style="font-size: 24px;">🎯</div>`,
+  className: "",
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});
+
 const MapUpdater = ({ center }) => {
   const map = useMap();
   useEffect(() => {
@@ -37,6 +45,9 @@ const PilotDashboard = () => {
   const [viewMode, setViewMode] = useState("available");
   const [currentLocation, setCurrentLocation] = useState(null);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  // 🟢 State for detailed mission view
+  const [selectedMission, setSelectedMission] = useState(null);
 
   useEffect(() => {
     if (!pilotToken) return;
@@ -122,6 +133,7 @@ const PilotDashboard = () => {
       const res = await fetch(`${BASE_URL}/api/pilots/jobs/${bookingId}/accept`, { method: "POST", headers: { "Authorization": `Bearer ${pilotToken}` } });
       if (!res.ok) throw new Error("Could not accept this job.");
       setViewMode("my_jobs");
+      setSelectedMission(null);
       setStatusMsg({ type: "success", text: "Job accepted. Check your mission list." });
     } catch (err) { setStatusMsg({ type: "error", text: err.message }); }
   };
@@ -153,9 +165,10 @@ const PilotDashboard = () => {
         )}
 
         {!pilotToken ? (
+          /* Authentication Section */
           <div className="card max-w-lg mx-auto text-center">
-            <h1 className="text-2xl font-extrabold mb-2">Pilot Login</h1>
-            <p className="text-gray-400 text-sm mb-8 font-medium">Please sign in to start flying missions.</p>
+            <h1 className="text-2xl font-extrabold mb-2 uppercase tracking-tight">Pilot Access</h1>
+            <p className="text-gray-400 text-sm mb-8 font-medium">Link your credentials to the Aircab terminal.</p>
             <form onSubmit={handleAuthSubmit}>
               <input className="input-field" type="text" placeholder="Username" required value={authForm.username} onChange={(e) => setAuthForm({...authForm, username: e.target.value})} />
               <input className="input-field" type="password" placeholder="Password" required value={authForm.password} onChange={(e) => setAuthForm({...authForm, password: e.target.value})} />
@@ -171,21 +184,22 @@ const PilotDashboard = () => {
                 </>
               )}
               <button disabled={authLoading} type="submit" className="w-full py-4 bg-black text-white rounded-xl font-bold uppercase tracking-wide mt-4 shadow-lg active:scale-95 transition-all">
-                {authLoading ? "One moment..." : (authMode === "login" ? "Start Connection" : "Create Account")}
+                {authLoading ? "Synchronizing..." : (authMode === "login" ? "Initialize Link" : "Register Drone")}
               </button>
             </form>
             <button onClick={() => setAuthMode(authMode === "login" ? "register" : "login")} className="mt-6 text-xs font-bold text-gray-400 hover:text-black uppercase tracking-wider">
-              {authMode === "login" ? "New here? Sign up as a pilot" : "Already have an account? Log in"}
+              {authMode === "login" ? "New pilot? Join the fleet" : "Return to terminal"}
             </button>
           </div>
         ) : (
+          /* Dashboard Section */
           <>
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight">Pilot Hub</h1>
+                <h1 className="text-3xl font-black uppercase tracking-tighter">Pilot Hub</h1>
                 <div className="mt-1 flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${isBroadcasting ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{isBroadcasting ? "Sending live location" : "GPS disconnected"}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{isBroadcasting ? "Broadcasting Live Telemetry" : "GPS disconnected"}</span>
                 </div>
               </div>
               <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold hover:bg-gray-200">Sign Out</button>
@@ -195,11 +209,10 @@ const PilotDashboard = () => {
               {!currentLocation ? (
                 <div className="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center">
                   <div className="w-8 h-8 border-4 border-gray-300 border-t-black rounded-full animate-spin mb-3"></div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Searching for your location...</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Acquiring GPS Signal...</p>
                 </div>
               ) : (
                 <MapContainer center={currentLocation} zoom={15} style={{ height: "100%", width: "100%" }} zoomControl={false}>
-                  {/* 🟢 Updated TileLayer to CartoDB Positron (Light Color) */}
                   <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
                   <MapUpdater center={currentLocation} />
                   <Marker position={currentLocation} icon={pilotIcon} />
@@ -208,45 +221,120 @@ const PilotDashboard = () => {
             </div>
 
             <div className="flex bg-gray-200/50 p-1 rounded-xl mb-8">
-              <button onClick={() => setViewMode("available")} className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all ${viewMode === "available" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}>New Jobs</button>
+              <button onClick={() => setViewMode("available")} className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all ${viewMode === "available" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}>Job Board</button>
               <button onClick={() => setViewMode("my_jobs")} className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all ${viewMode === "my_jobs" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}>My Missions</button>
             </div>
 
             {loading ? (
-              <p className="text-center text-xs font-bold text-gray-300 uppercase animate-pulse">Checking for jobs...</p>
+              <p className="text-center text-xs font-bold text-gray-300 uppercase animate-pulse py-20">Scanning frequencies...</p>
             ) : jobs.length === 0 ? (
-              <div className="card text-center py-20 border-dashed border-2">
-                <p className="text-gray-400 font-medium">No missions available right now.</p>
+              <div className="card text-center py-20 border-dashed border-2 opacity-50">
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No active missions available</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {jobs.map((job) => (
-                  <div key={job.booking_id} className="card flex flex-col hover:border-gray-300 transition-colors">
+                  <div 
+                    key={job.booking_id} 
+                    onClick={() => setSelectedMission(job)} // 🟢 Open Mission Detail
+                    className="card flex flex-col cursor-pointer hover:border-gray-300 transition-all active:scale-[0.98]"
+                  >
                     <div className="flex justify-between items-start mb-6 border-b border-gray-50 pb-4">
                       <div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase mb-1 tracking-widest">ID: {job.booking_id.slice(0,8)}</p>
-                        <h2 className="text-lg font-bold text-black">{job.service_type}</h2>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase mb-1 tracking-widest">Mission: {job.booking_id.slice(0,8)}</p>
+                        <h2 className="text-lg font-black uppercase text-black tracking-tight">{job.service_type}</h2>
                       </div>
                       <span className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase border ${job.status === 'in_progress' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-100 text-gray-500'}`}>{job.status}</span>
                     </div>
 
                     <div className="space-y-4 mb-8 flex-grow">
-                      <div><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">When</p><p className="font-bold text-sm">{job.date} at {job.time}</p></div>
-                      <div><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Payment</p><p className="font-bold text-sm text-green-600">₹{job.total_price}</p></div>
-                      <div><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Mission Location</p><p className="text-xs text-gray-500 font-medium leading-relaxed">{job.address}</p></div>
+                      <div><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Schedule</p><p className="font-bold text-sm">{job.date} @ {job.time}</p></div>
+                      <div><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Deployment Zone</p><p className="text-xs text-gray-500 font-medium leading-relaxed truncate">{job.address}</p></div>
+                      <p className="text-sm font-black text-green-600">₹{job.total_price}</p>
                     </div>
 
                     <div className="pt-2">
-                      {viewMode === "available" && <button onClick={() => acceptJob(job.booking_id)} className="w-full py-3 bg-black text-white rounded-xl font-bold text-sm">Accept Job</button>}
-                      {viewMode === "my_jobs" && job.status === "Accepted" && <button onClick={() => updateJobStatus(job.booking_id, "in_progress")} className="w-full py-3 bg-black text-white rounded-xl font-bold text-sm">Start Flight</button>}
-                      {viewMode === "my_jobs" && job.status === "in_progress" && <button onClick={() => updateJobStatus(job.booking_id, "Delivered")} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold text-sm">Finish Job</button>}
-                      {viewMode === "my_jobs" && job.status === "Delivered" && <div className="w-full py-3 bg-gray-50 text-gray-400 text-center rounded-xl font-bold text-sm">Mission Completed</div>}
+                       <p className="text-[9px] font-black text-gray-300 uppercase text-center">Click for Mission Briefing</p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </>
+        )}
+
+        {/* 📋 MISSION BRIEFING MODAL */}
+        {selectedMission && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+              {/* Modal Map Section */}
+              <div className="w-full h-64 bg-gray-100 relative">
+                <MapContainer center={[selectedMission.location.lat, selectedMission.location.lon]} zoom={14} style={{ height: "100%", width: "100%" }} zoomControl={false}>
+                  <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                  <Marker position={[selectedMission.location.lat, selectedMission.location.lon]} icon={missionTargetIcon} />
+                </MapContainer>
+                <button onClick={() => setSelectedMission(null)} className="absolute top-6 right-6 z-[1000] w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg font-bold">✕</button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-10">
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-2 block">Mission Briefing</span>
+                    <h2 className="text-3xl font-black uppercase tracking-tighter">{selectedMission.service_type}</h2>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Estimated Payment</p>
+                    <p className="text-2xl font-black text-green-600">₹{selectedMission.total_price}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 mb-10">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Customer</p>
+                    <p className="font-bold text-sm">{selectedMission.customer_name || "Enterprise Client"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Schedule</p>
+                    <p className="font-bold text-sm">{selectedMission.date} at {selectedMission.time}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Deployment Location</p>
+                    <p className="text-sm font-medium text-gray-600">{selectedMission.address}</p>
+                  </div>
+                  <div className="col-span-2 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Flight Instructions</p>
+                    <p className="text-xs text-gray-500 leading-relaxed font-medium">
+                      {selectedMission.instructions || "Standard operating procedure applies. Maintain visual line of sight and monitor telemetry 120Hz. Battery cells must be at 4.2V nominal before ignition."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  {viewMode === "available" ? (
+                    <button 
+                      onClick={() => acceptJob(selectedMission.booking_id)} 
+                      className="w-full py-5 bg-black text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:bg-gray-900 transition-all active:scale-95"
+                    >
+                      Accept Mission
+                    </button>
+                  ) : (
+                    <>
+                      {selectedMission.status === "Accepted" && (
+                        <button onClick={() => updateJobStatus(selectedMission.booking_id, "in_progress")} className="w-full py-5 bg-black text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl active:scale-95">Begin Operation</button>
+                      )}
+                      {selectedMission.status === "in_progress" && (
+                        <button onClick={() => updateJobStatus(selectedMission.booking_id, "Delivered")} className="w-full py-5 bg-green-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl active:scale-95">Confirm Delivery</button>
+                      )}
+                      {selectedMission.status === "Delivered" && (
+                        <div className="w-full py-5 bg-gray-100 text-gray-400 text-center rounded-2xl font-black uppercase tracking-widest text-sm italic">Mission Archive Closed</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
