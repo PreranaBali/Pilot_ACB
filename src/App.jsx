@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import PilotRegistration from "./Pages/PilotRegistration";
-import PilotDashboard from "./Pages/PilotDashboard";
+import PilotRegistration from "./pages/PilotRegistration";
+import PilotDashboard from "./pages/PilotDashboard";
 
 function App() {
   return (
